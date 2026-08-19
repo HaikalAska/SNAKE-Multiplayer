@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sweet Chaos Area</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+    <!-- ================================================================
+         EVENT CARD OVERLAY — muncul saat pion mendarat di event tile
+    ================================================================== -->
+    <div id="event-card-overlay" class="event-card-overlay hidden">
+        <div class="event-card">
+            <div class="event-card-inner">
+                <p id="event-card-title" class="event-card-title">❓ Pertanyaan Romantis</p>
+                <div class="event-card-divider"></div>
+
+                <!-- Wildcard Flip Card (hidden by default) -->
+                <div id="wildcard-flip-outer" class="wildcard-flip-outer hidden">
+                    <div class="wildcard-flip-inner" id="wildcard-flip-inner">
+                        <!-- Front: card back visual -->
+                        <div class="wildcard-face wildcard-face-front" id="wildcard-flip-front">
+                            <div class="wildcard-cardback">
+                                <div class="wildcard-cardback-pattern">🎴</div>
+                                <div class="wildcard-cardback-label">KARTU RISIKO</div>
+                                <div class="wildcard-cardback-sub">Ketuk untuk membuka takdir...</div>
+                            </div>
+                        </div>
+                        <!-- Back: revealed content -->
+                        <div class="wildcard-face wildcard-face-back" id="wildcard-flip-back">
+                            <div class="wildcard-revealed">
+                                <div id="wildcard-back-icon" class="wildcard-revealed-icon">🎴</div>
+                                <div id="wildcard-back-title" class="wildcard-revealed-title">???</div>
+                                <div id="wildcard-back-desc" class="wildcard-revealed-desc"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="event-card-body" class="event-card-body"></div>
+                <div id="event-card-instruction" class="event-card-instruction"></div>
+                <div class="event-card-actions">
+                    <button id="event-card-main-btn" class="btn event-main-btn">Sudah Dijawab ✓</button>
+                    <button id="event-card-penalty-btn" class="btn event-penalty-btn hidden">Tidak Mau Jawab (Mundur 10)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         MAIN GAME CONTAINER
+    ================================================================== -->
+    <div class="app-container">
+
+        <!-- Left Vertical Branding Banner -->
+    
+
+        <!-- Central Board Frame -->
+        <main class="board-wrapper">
+            <div class="board-frame">
+                <svg id="snakes-ladders-svg" class="overlay-svg"></svg>
+                <div id="board-grid" class="board-grid"></div>
+                <div id="pawns-layer" class="pawns-layer"></div>
+            </div>
+        </main>
+
+        <!-- Right Side Control Dashboard -->
+        <aside class="dashboard-panel">
+
+            <!-- Online Status Bar -->
+            <div class="status-bar-container">
+                <div id="online-status-badge" class="status-badge badge-local">
+                    <i class="fa-solid fa-laptop"></i> Mode: Offline (1 Layar)
+                </div>
+                <button id="btn-open-online-modal" class="btn btn-online-mode">
+                    <i class="fa-solid fa-earth-asia"></i> Main Online (LDR)
+                </button>
+            </div>
+
+            <!-- Current Turn Hero Card -->
+            <section class="card turn-hero-card">
+                <div class="turn-hero-body">
+                    <div id="turn-hero-avatar-wrapper" class="turn-hero-avatar-wrapper">
+                        <img id="active-player-avatar" src="" alt="Avatar" class="turn-hero-avatar">
+                        <div class="turn-hero-glow" id="turn-hero-glow"></div>
+                    </div>
+                    <div class="turn-hero-info">
+                        <div class="turn-hero-label">✨ Giliran Sekarang</div>
+                        <div id="active-player-name" class="turn-hero-name">Pemain 1</div>
+                    </div>
+                    <div id="game-status-msg" class="game-status-msg">Lempar dadu untuk mulai!</div>
+                </div>
+            </section>
+
+            <!-- Active Global Event Card (shows when a global event is running) -->
+            <section id="active-event-card" class="card active-event-card hidden">
+                <div class="active-event-header">
+                    <span id="active-event-title" class="active-event-title">🐍 WABAH ULAR</span>
+                    <span id="active-event-timer" class="active-event-timer"><i class="fa-solid fa-hourglass-half"></i> Sisa 5 Turn</span>
+                </div>
+                <div id="active-event-desc" class="active-event-desc">Papan dipenuhi 16 ular raksasa selama 5 ronde!</div>
+            </section>
+
+            <!-- Event Legend -->
+            <section class="card legend-card">
+                <div class="legend-grid">
+                    <div class="legend-item legend-q">  <span class="legend-icon">?</span>  <span>Pertanyaan</span></div>
+                    <div class="legend-item legend-ch"> <span class="legend-icon">⚡</span> <span>Tantangan</span></div>
+                    <div class="legend-item legend-rm"> <span class="legend-icon">💕</span> <span>+3 Bonus</span></div>
+                    <div class="legend-item legend-bn"> <span class="legend-icon">🎁</span> <span>Roll Lagi!</span></div>
+                    <div class="legend-item legend-pe"> <span class="legend-icon">💀</span> <span>Skip Giliran</span></div>
+                    <div class="legend-item legend-sn"> <span class="legend-icon">🐍</span> <span>Turun</span></div>
+                    <div class="legend-item legend-wc" style="grid-column:span 2"> <span class="legend-icon">🎴</span> <span>Kartu Risiko (Baik/Buruk)</span></div>
+                </div>
+            </section>
+
+            <!-- Dice Card -->
+            <section class="card dice-card">
+                <div class="card-header center">
+                    <h2>Lempar Dadu</h2>
+                    <p class="subtitle">Ngambek &amp; cemburunya nanti aja ya. #IZIIIN</p>
+                </div>
+                <div class="dice-body">
+                    <div id="dice-container" class="dice-container" title="Klik untuk melempar dadu!">
+                        <div id="dice-cube" class="dice-cube">
+                            <div class="dice-face face-1"><span class="dot d-center"></span></div>
+                            <div class="dice-face face-2"><span class="dot d-top-right"></span><span class="dot d-bottom-left"></span></div>
+                            <div class="dice-face face-3"><span class="dot d-top-right"></span><span class="dot d-center"></span><span class="dot d-bottom-left"></span></div>
+                            <div class="dice-face face-4"><span class="dot d-top-left"></span><span class="dot d-top-right"></span><span class="dot d-bottom-left"></span><span class="dot d-bottom-right"></span></div>
+                            <div class="dice-face face-5"><span class="dot d-top-left"></span><span class="dot d-top-right"></span><span class="dot d-center"></span><span class="dot d-bottom-left"></span><span class="dot d-bottom-right"></span></div>
+                            <div class="dice-face face-6"><span class="dot d-top-left"></span><span class="dot d-top-right"></span><span class="dot d-mid-left"></span><span class="dot d-mid-right"></span><span class="dot d-bottom-left"></span><span class="dot d-bottom-right"></span></div>
+                        </div>
+                    </div>
+                    <button id="roll-btn" class="btn btn-roll">
+                        <i class="fa-solid fa-dice"></i> Lempar Dadu
+                    </button>
+                </div>
+            </section>
+
+            <!-- Players List -->
+            <section class="card players-card">
+                <div class="players-card-header">
+                    <h3><i class="fa-solid fa-users"></i> Pemain</h3>
+                    <p class="players-tagline">Jangan rebutan pionnya ya~</p>
+                </div>
+                <div id="players-list" class="players-list"></div>
+                <div class="game-control-buttons">
+                    <button id="btn-setup-game" class="btn btn-secondary btn-sm">
+                        <i class="fa-solid fa-user-pen"></i> Atur Pemain
+                    </button>
+                    <button id="btn-sound-toggle" class="btn btn-secondary btn-sm">
+                        <i class="fa-solid fa-volume-high"></i> <span id="sound-text">Suara: ON</span>
+                    </button>
+                </div>
+            </section>
+
+        </aside>
+    </div>
+
+    <!-- ================================================================
+         MODALS
+    ================================================================== -->
+
+    <!-- Offline Player Setup Modal -->
+    <div id="setup-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-users"></i> Pengaturan Pemain (Offline)</h3>
+                <button id="close-modal-btn" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Jumlah Pemain:</label>
+                    <select id="player-count-select" class="form-control">
+                        <option value="2" selected>2 Pemain (Pasangan)</option>
+                        <option value="3">3 Pemain</option>
+                        <option value="4">4 Pemain</option>
+                    </select>
+                </div>
+                <div id="player-inputs-container" class="player-inputs-container"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-setup-btn" class="btn btn-primary">
+                    <i class="fa-solid fa-play"></i> Mulai / Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Online Multiplayer Modal -->
+    <div id="online-modal" class="modal-overlay hidden">
+        <div class="modal-card online-modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-earth-asia"></i> Main Online (LDR Mode)</h3>
+                <button id="close-online-modal-btn" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="online-tabs">
+                    <button id="tab-host-btn" class="online-tab-btn active"><i class="fa-solid fa-plus-circle"></i> Buat Room (Host)</button>
+                    <button id="tab-guest-btn" class="online-tab-btn"><i class="fa-solid fa-right-to-bracket"></i> Gabung Room</button>
+                </div>
+
+                <div id="tab-host-content" class="online-tab-content">
+                    <div class="form-group">
+                        <label>Nama Kamu (Host):</label>
+                        <input type="text" id="host-name-input" class="form-control" value="Pemain 1 (Him)" placeholder="Masukkan namamu">
+                    </div>
+                    <div class="form-group">
+                        <label>Pilih Avatar:</label>
+                        <div id="host-avatar-group" class="avatar-select-group"></div>
+                    </div>
+                    <button id="btn-create-room" class="btn btn-primary btn-block">
+                        <i class="fa-solid fa-key"></i> Dapatkan Kode Room
+                    </button>
+                    <div id="host-room-info" class="room-info-box hidden">
+                        <p class="room-info-label" style="font-weight:600;margin-bottom:8px;">🔗 Link Room Siap Dibagikan:</p>
+                        <div class="room-link-input-group" style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">
+                            <input type="text" id="display-room-link" class="form-control" readonly style="font-size:12px;background:rgba(0,0,0,0.4);border:1px solid #ff4081;color:#fff;cursor:text;text-overflow:ellipsis;" value="">
+                            <button id="btn-copy-link" class="btn btn-primary btn-sm" style="white-space:nowrap;padding:8px 14px;font-weight:600;"><i class="fa-solid fa-copy"></i> Salin Link</button>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;opacity:0.9;">
+                            <span>Kode: <strong id="display-room-code" style="color:#ffd43b;letter-spacing:1px;font-size:13px;">UT-XXXX</strong></span>
+                            <button id="btn-copy-code" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;"><i class="fa-solid fa-copy"></i> Salin Kode Saja</button>
+                        </div>
+                        <div class="waiting-partner-pulse" style="margin-top:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Menunggu pasanganmu membuka link...</div>
+                    </div>
+                </div>
+
+                <div id="tab-guest-content" class="online-tab-content hidden">
+                    <div class="form-group">
+                        <label>Kode / Link Room Pasangan:</label>
+                        <input type="text" id="guest-room-code-input" class="form-control code-input" placeholder="Tempel Link atau Kode Room di sini">
+                    </div>
+                    <div class="form-group">
+                        <label>Nama Kamu:</label>
+                        <input type="text" id="guest-name-input" class="form-control" value="Pemain 2 (Her)" placeholder="Masukkan namamu">
+                    </div>
+                    <div class="form-group">
+                        <label>Pilih Avatar:</label>
+                        <div id="guest-avatar-group" class="avatar-select-group"></div>
+                    </div>
+                    <button id="btn-join-room" class="btn btn-primary btn-block">
+                        <i class="fa-solid fa-link"></i> Gabung &amp; Main Sekarang
+                    </button>
+                    <div id="guest-connecting-msg" class="connecting-status-msg hidden">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer modal-footer-between">
+                <button id="btn-switch-to-local" class="btn btn-secondary">
+                    <i class="fa-solid fa-laptop"></i> Tetap Offline
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="winner-modal" class="modal-overlay hidden">
+        <div class="modal-card winner-card">
+            <div class="winner-body">
+                <div class="trophy-icon">🏆</div>
+                <h2>Selamat!</h2>
+                <p id="winner-text" class="winner-announcement">Pemain 1 adalah pemenangnya!</p>
+                <div id="winner-avatar-display" class="winner-avatar-display"></div>
+                <p class="winner-quote">"Semoga langgeng &amp; makin sayang ya! ❤️"</p>
+                <button id="btn-restart-game" class="btn btn-primary btn-lg">
+                    <i class="fa-solid fa-rotate"></i> Main Lagi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts — events.js menggantikan questions.js -->
+    <script src="js/audio.js"></script>
+    <script src="js/events.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/dice.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
